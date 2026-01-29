@@ -85,7 +85,7 @@ CSRF_TRUSTED_ORIGINS = [
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
-    "https://frontend-murdle.vercel.app",
+    "https://murdle-project.vercel.app",
     "http://localhost:5173"
 ]
 
