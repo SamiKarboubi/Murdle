@@ -5,7 +5,8 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import EnigmeSerializer,EnigmeListSerializer
 import random, string
-from .game_state import games
+import redis_client
+import json
 # Create your views here.
 
 
@@ -33,9 +34,11 @@ def generate_code():
 class CreateGameAPIView(APIView):
     def post(self,request):
         enigme_id = request.data["enigme_id"]
+        if not enigme_id:
+            return Response({"error": "enigme_id required"}, status=400)
         code = generate_code()
         
-        games[code] = {
+        game_data = {
             "enigme_id" : enigme_id,
             "state" : {
                 "grid": None,
@@ -47,9 +50,26 @@ class CreateGameAPIView(APIView):
                 "solutionTime": None
             },
             "chat":[],
-            "players":0,
             "startTime" : None
         }
+
+        pipe = redis_client.pipeline()
+
+        pipe.set(
+            f"game:{code}",
+            json.dumps(game_data),
+            ex=14400
+        )
+
+        pipe.set(
+            f"game:{code}:players",
+            0,
+            ex=14400
+        )
+
+        pipe.execute()
+
+
         return Response({"code":code,"enigme_id" : enigme_id}, status=201)
     
     

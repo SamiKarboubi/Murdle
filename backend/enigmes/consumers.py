@@ -1,49 +1,64 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
-from .game_state import games
 import time
+import redis_client
 
 class GameConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.code = self.scope["url_route"]["kwargs"]["code"]
-        print("CONNECT CODE:", self.code)
-        print("GAMES:", games)
-        if self.code not in games:
+        
+        game_json = redis_client.get(f"game:{self.code}")
+
+        if not game_json:
             await self.close()
             return
-        
+        game_data = json.loads(game_json)
         self.room = f"game_{self.code}"
-        print("CONNECT CODE:", self.code)
-        print("AVAILABLE GAMES:", games.keys())
+        
         await self.channel_layer.group_add(self.room, self.channel_name)
         await self.accept()
-        
-        if games[self.code]["players"] == 0:
-            games[self.code]["startTime"] = time.time()
+        players = redis_client.incr(f"game:{self.code}:players")
 
-        games[self.code]["players"] += 1
+        if players == 1:
+            game_data["startTime"] = time.time()
+            redis_client.set(
+                f"game:{self.code}",
+                json.dumps(game_data)
+            )
+        else:
+            # reload to get correct startTime
+            game_json = redis_client.get(f"game:{self.code}")
+            game_data = json.loads(game_json)
+        
         await self.send(json.dumps({
             "type":"init",
-            "state":games[self.code]["state"],
-            "chat":games[self.code]["chat"],
-            "startTime":games[self.code]["startTime"]
+            "state":game_data["state"],
+            "chat":game_data["chat"],
+            "startTime":game_data["startTime"]
             }))
         
     async def disconnect(self,close_code):
-        if self.code not in games:
-            return
 
-        games[self.code]["players"] -= 1
-
-        if games[self.code]["players"] <= 0:
-            del games[self.code]
+        if redis_client.exists(f"game:{self.code}:players"):
+            players = redis_client.decr(f"game:{self.code}:players")
+        
+            if players <= 0:
+                redis_client.delete(f"game:{self.code}")
+                redis_client.delete(f"game:{self.code}:players")
+        
 
 
     async def receive(self, text_data):
         data = json.loads(text_data)
-        
+
+        game_json = redis_client.get(f"game:{self.code}")
+
+        if not game_json:
+            return
+        game_data = json.loads(game_json)
         if data["type"] == "state":
-            games[self.code]["state"] = data["state"]
+            
+            game_data["state"] = data["state"]
 
             await self.channel_layer.group_send(
             self.room,
@@ -55,10 +70,10 @@ class GameConsumer(AsyncWebsocketConsumer):
 
         elif data["type"] == "chat":
             message = data["chat"]
-            games[self.code]["chat"].append(message)
+            game_data["chat"].append(message)
 
-            if len(games[self.code]["chat"]) > 20:
-                games[self.code]["chat"].pop(0)
+            if len(game_data["chat"]) > 20:
+                game_data["chat"].pop(0)
 
             await self.channel_layer.group_send(
             self.room,
@@ -67,6 +82,11 @@ class GameConsumer(AsyncWebsocketConsumer):
                 "message":message
             }
         )
+        redis_client.set(
+            f"game:{self.code}",
+            json.dumps(game_data)
+        )
+
 
 
 
