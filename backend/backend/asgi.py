@@ -12,7 +12,6 @@ from django.core.asgi import get_asgi_application
 from channels.routing import ProtocolTypeRouter, URLRouter
 from enigmes.routing import websocket_urlpatterns
 
-print("ASGI LOADED")  
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "backend.settings")
 
