@@ -1,7 +1,7 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 import time
-import redis_client
+from redis_client import redis_client
 
 class GameConsumer(AsyncWebsocketConsumer):
     async def connect(self):

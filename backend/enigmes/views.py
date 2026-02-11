@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from .serializers import EnigmeSerializer,EnigmeListSerializer
 import random, string
-import redis_client
+from redis_client import redis_client
 import json
 # Create your views here.
 
